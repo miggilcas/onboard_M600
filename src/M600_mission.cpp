@@ -157,7 +157,7 @@ std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<senso
   ROS_INFO("Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
            gps_pos.longitude, start_alt);
 
-  std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp);
+  std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp, gpsList);
  
   return wpVector;
 }
