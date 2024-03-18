@@ -52,8 +52,7 @@
   <depend>std_srvs</depend>
   <depend>message_generation</depend>
   <depend>message_runtime</depend>
-  <run_depend>dji_sdk</run_depend>
-
+  
   <build_export_depend>dji_sdk</build_export_depend>
   <exec_depend>dji_sdk</exec_depend>
 
