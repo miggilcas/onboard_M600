@@ -15,6 +15,8 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
   )
 
+find_package(DJIOSDK REQUIRED)
+
 # Declare the service files to be built
 #add_service_files(FILES
 	#ProcessImg.srv
