@@ -38,7 +38,7 @@ catkin_package(
   INCLUDE_DIRS include
   # LIBRARIES
   CATKIN_DEPENDS
-    dji_sdk
+    #dji_sdk
     aerialcore_common
     std_msgs
     message_runtime
@@ -71,6 +71,8 @@ include_directories(
 # add_executable(${PROJECT_NAME}_node src/onboard-sdk-ros_node.cpp)
 
 add_executable(m600_mission_node src/M600_mission.cpp)
-target_link_libraries(m600_mission_node dji_sdk)
+target_link_libraries(m600_mission_node 
+        ${catkin_LIBRARIES} 
+        ${DJIOSDK_LIBRARIES})
 add_dependencies(m600_mission_node ${catkin_EXPORTED_TARGETS})
 
