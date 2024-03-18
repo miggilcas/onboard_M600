@@ -43,7 +43,8 @@
   <!-- Use doc_depend for packages you need only for building documentation: -->
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
-  <depend>dji_sdk</depend>
+  <build_depend>dji_sdk</build_depend>
+
   <depend>aerialcore_common</depend>
   <depend>roscpp</depend>
   <depend>rospy</depend>
@@ -51,5 +52,7 @@
   <depend>std_srvs</depend>
   <depend>message_generation</depend>
   <depend>message_runtime</depend>
+  <build_export_depend>dji_sdk</build_export_depend>
+  <exec_depend>dji_sdk</exec_depend>
 
 </package>
