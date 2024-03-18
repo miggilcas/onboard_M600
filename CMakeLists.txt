@@ -36,6 +36,7 @@ catkin_package(
   INCLUDE_DIRS include
   # LIBRARIES
   CATKIN_DEPENDS
+    dji_sdk
     aerialcore_common
     std_msgs
     message_runtime
