@@ -53,7 +53,7 @@ bool configMission(aerialcore_common::ConfigMission::Request  &req,
     // actions functionality
     std_msgs::Float64MultiArray acommandList = req.commandList; //TBD 
     std_msgs::Float64MultiArray acommandParameter = req.commandParameter; //TBD
-    actionNumber=0;
+    //actionNumber=0;
     
     
     
@@ -69,7 +69,7 @@ bool configMission(aerialcore_common::ConfigMission::Request  &req,
         for (int j = 0; j < 10; j++)
         {
         // counting the number of actions
-        if (acommandList.data[i*10+j]) actionNumber++;
+        //if (acommandList.data[i*10+j]) actionNumber++;
         switch (int(acommandList.data[i*10+j]))
         {
         case 1:// take a photo
@@ -85,7 +85,7 @@ bool configMission(aerialcore_common::ConfigMission::Request  &req,
             yaw_list_global.data[i] = acommandParameter.data[i*10+j]; // TBD: Explore if it could be reused
             break;
         case 5:// gimbal pitch 
-            gimbal_pitch_list_global.data[i] = acommandParameter.data[i*10+j];
+            //gimbal_pitch_list_global.data[i] = acommandParameter.data[i*10+j];
             break;
         default:
             break;
@@ -105,22 +105,6 @@ bool configMission(aerialcore_common::ConfigMission::Request  &req,
     // if everything goes right we run the whole thing
     res.success = runWaypointMission(gpsList_global.size(), 1);
     return true;
-}
-
-// After configuring the mission through the YAML the waypoints are created
-std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<sensor_msgs::NavSatFix> gpsList, float32_t start_alt){
-  // Create Start Waypoint
-  WayPointSettings start_wp;
-  setWaypointDefaults(&start_wp);
-  start_wp.latitude  = gps_pos.latitude;
-  start_wp.longitude = gps_pos.longitude;
-  start_wp.altitude  = start_alt;
-  ROS_INFO("Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
-           gps_pos.longitude, start_alt);
-
-  std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp);
- 
-  return wpVector;
 }
 
 // They are generated thanks to the YAML file and the configuration service
@@ -161,6 +145,24 @@ std::vector<DJI::OSDK::WayPointSettings> generateWaypointsCustom(WayPointSetting
 
   return wp_list;
 }
+
+// After configuring the mission through the YAML the waypoints are created
+std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<sensor_msgs::NavSatFix> gpsList, float32_t start_alt){
+  // Create Start Waypoint
+  WayPointSettings start_wp;
+  setWaypointDefaults(&start_wp);
+  start_wp.latitude  = gps_pos.latitude;
+  start_wp.longitude = gps_pos.longitude;
+  start_wp.altitude  = start_alt;
+  ROS_INFO("Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
+           gps_pos.longitude, start_alt);
+
+  std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp);
+ 
+  return wpVector;
+}
+
+
 
 
 void
