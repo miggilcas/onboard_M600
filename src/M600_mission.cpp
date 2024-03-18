@@ -31,6 +31,138 @@ ros::Subscriber        gps_pos_subscriber;
 std::vector<sensor_msgs::NavSatFix> gpsList_global;
 std_msgs::Float64MultiArray yaw_list_global;
 
+// Configuration of the mission obtained from the .YAML file
+bool configMission(aerialcore_common::ConfigMission::Request  &req,
+        aerialcore_common::ConfigMission::Response &res){
+    ROS_WARN("Received mission");
+
+    //ros::NodeHandle nodehandler;
+
+    
+    gpsList_global = req.waypoint; // WORKS
+    yaw_list_global = req.yaw; // WORKS
+    //yaw_mode_global = req.yawMode; // TBD
+    //gimbal_pitch_list_global = req.gimbalPitch; // UNUSEFUL HERE
+    // velocity_range = req.maxVel;
+    // idle_velocity = req.idleVel;
+    // finish_action = req.finishAction;
+
+    // //varying velocity
+    // speed_global = req.speed;
+
+    // actions functionality
+    std_msgs::Float64MultiArray acommandList = req.commandList; //TBD 
+    std_msgs::Float64MultiArray acommandParameter = req.commandParameter; //TBD
+    actionNumber=0;
+    
+    
+    
+    // We need to create a vector of actions
+    if (acommandList.data.size() != acommandParameter.data.size()){
+    ROS_ERROR("The number of actions and parameters is not the same");
+    return false;
+    }
+
+    // We need to be sure that exists actions
+    if (acommandList.data.size() >= 0){
+    for (int i = 0; i < gpsList_global.size(); i++){
+        for (int j = 0; j < 10; j++)
+        {
+        // counting the number of actions
+        if (acommandList.data[i*10+j]) actionNumber++;
+        switch (int(acommandList.data[i*10+j]))
+        {
+        case 1:// take a photo
+            //take_a_photo[i] = true;
+            break;
+        case 2:// start recording
+            //start_recording[i] = true;
+            break;
+        case 3:// stop recording
+            //stop_recording[i] = true; 
+            break;
+        case 4:// craft control yaw
+            yaw_list_global.data[i] = acommandParameter.data[i*10+j]; // TBD: Explore if it could be reused
+            break;
+        case 5:// gimbal pitch 
+            gimbal_pitch_list_global.data[i] = acommandParameter.data[i*10+j];
+            break;
+        default:
+            break;
+        }
+        ;
+        
+
+        }
+    }
+    }
+    
+    // ROS_WARN("Total number of actions: %d", actionNumber);
+    
+    // ROS_WARN("Last ActionID: %d",this->actionIDCounter);
+    // ROS_WARN("Finish action: %d",finish_action);
+
+    // if everything goes right we run the whole thing
+    res.success = runWaypointMission(gpsList_global.size(), 1);
+    return true;
+}
+
+// After configuring the mission through the YAML the waypoints are created
+std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<sensor_msgs::NavSatFix> gpsList, float32_t start_alt){
+  // Create Start Waypoint
+  WayPointSettings start_wp;
+  setWaypointDefaults(&start_wp);
+  start_wp.latitude  = gps_pos.latitude;
+  start_wp.longitude = gps_pos.longitude;
+  start_wp.altitude  = start_alt;
+  ROS_INFO("Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
+           gps_pos.longitude, start_alt);
+
+  std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp);
+ 
+  return wpVector;
+}
+
+// They are generated thanks to the YAML file and the configuration service
+std::vector<DJI::OSDK::WayPointSettings> generateWaypointsCustom(WayPointSettings* start_data, std::vector<sensor_msgs::NavSatFix> gpsList){
+  // Let's create a vector to store our waypoints in.
+  std::vector<DJI::OSDK::WayPointSettings> wp_list;
+
+  // First waypoint
+  start_data->index = 0;
+  wp_list.push_back(*start_data);
+
+  // Iterative algorithm
+  for (int i = 1; i < gpsList.size(); i++)
+  {
+    WayPointSettings  wp;
+    
+    setWaypointDefaults(&wp);
+    wp.index     = i;
+    wp.latitude  = gpsList[i].latitude;
+    wp.longitude = gpsList[i].longitude;
+    wp.altitude  = gpsList[i].altitude;
+
+    // yaw parameters:
+    if (yaw_list_global.data[i]< yaw_list_global.data[i+1] && i <= gpsList.size())
+      wp.turnMode           = 0; // depends on the yaw
+    else{
+      wp.turnMode           = 1;
+    }
+
+    wp.yaw = yaw_list_global.data[i];
+
+    wp_list.push_back(wp);
+  }
+
+  // Come back home
+  start_data->index = gpsList.size();
+  wp_list.push_back(*start_data);
+
+  return wp_list;
+}
+
+
 void
 gpsPosCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
 {
@@ -53,7 +185,7 @@ runWaypointMission(uint8_t numWaypoints, int responseTimeout)
   //std::vector<WayPointSettings> generatedWaypts =
   //  createWaypoints(numWaypoints, increment, start_alt);
   std::vector<WayPointSettings> generatedWaypts =
-    createWaypointsCustom(gpsList_global);
+    createWaypointsCustom(gpsList_global, start_alt);
 
   // Waypoint Mission: Upload the waypoints
   ROS_INFO("Uploading Waypoints..\n");
@@ -496,136 +628,6 @@ hotpointUpdateYawRate(float yawRate, int direction)
                     missionHpUpdateYawRate.response.ack_data);
 }
 
-// Configuration of the mission obtained from the .YAML file
-bool configMission(aerialcore_common::ConfigMission::Request  &req,
-        aerialcore_common::ConfigMission::Response &res){
-    ROS_WARN("Received mission");
-
-    //ros::NodeHandle nodehandler;
-
-    
-    gpsList_global = req.waypoint; // WORKS
-    yaw_list_global = req.yaw; // WORKS
-    yaw_mode_global = req.yawMode; // TBD
-    gimbal_pitch_list_global = req.gimbalPitch; // UNUSEFUL HERE
-    velocity_range = req.maxVel;
-    idle_velocity = req.idleVel;
-    finish_action = req.finishAction;
-
-    //varying velocity
-    speed_global = req.speed;
-
-    // actions functionality
-    std_msgs::Float64MultiArray acommandList = req.commandList; //TBD 
-    std_msgs::Float64MultiArray acommandParameter = req.commandParameter; //TBD
-    actionNumber=0;
-    
-    
-    
-    // We need to create a vector of actions
-    if (acommandList.data.size() != acommandParameter.data.size()){
-    ROS_ERROR("The number of actions and parameters is not the same");
-    return false;
-    }
-
-    // We need to be sure that exists actions
-    if (acommandList.data.size() >= 0){
-    for (int i = 0; i < gpsList_global.size(); i++){
-        for (int j = 0; j < 10; j++)
-        {
-        // counting the number of actions
-        if (acommandList.data[i*10+j]) actionNumber++;
-        switch (int(acommandList.data[i*10+j]))
-        {
-        case 1:// take a photo
-            take_a_photo[i] = true;
-            break;
-        case 2:// start recording
-            start_recording[i] = true;
-            break;
-        case 3:// stop recording
-            stop_recording[i] = true; 
-            break;
-        case 4:// craft control yaw
-            yaw_list_global.data[i] = acommandParameter.data[i*10+j]; // TBD: Explore if it could be reused
-            break;
-        case 5:// gimbal pitch 
-            gimbal_pitch_list_global.data[i] = acommandParameter.data[i*10+j];
-            break;
-        default:
-            break;
-        }
-        ;
-        
-
-        }
-    }
-    }
-    
-    ROS_WARN("Total number of actions: %d", actionNumber);
-    
-    ROS_WARN("Last ActionID: %d",this->actionIDCounter);
-    ROS_WARN("Finish action: %d",finish_action);
-
-    // if everything goes right we run the whole thing
-    res.success = runWaypointMission(gpsList_global.size(), 1);
-    return true;
-}
-
-// After configuring the mission through the YAML the waypoints are created
-std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<sensor_msgs::NavSatFix> gpsList){
-  // Create Start Waypoint
-  WayPointSettings start_wp;
-  setWaypointDefaults(&start_wp);
-  start_wp.latitude  = gps_pos.latitude;
-  start_wp.longitude = gps_pos.longitude;
-  start_wp.altitude  = start_alt;
-  ROS_INFO("Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
-           gps_pos.longitude, start_alt);
-
-  std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp);
- 
-  return wpVector;
-}
-
-// They are generated thanks to the YAML file and the configuration service
-std::vector<DJI::OSDK::WayPointSettings> generateWaypointsCustom(WayPointSettings* start_data, std::vector<sensor_msgs::NavSatFix> gpsList){
-  // Let's create a vector to store our waypoints in.
-  std::vector<DJI::OSDK::WayPointSettings> wp_list;
-
-  // First waypoint
-  start_data->index = 0;
-  wp_list.push_back(*start_data);
-
-  // Iterative algorithm
-  for (int i = 1; i < gpsList.size(); i++)
-  {
-    WayPointSettings  wp;
-    
-    setWaypointDefaults(&wp);
-    wp.index     = i;
-    wp.latitude  = gpsList[i].latitude;
-    wp.longitude = gpsList[i].longitude;
-    wp.altitude  = gpsList[i].altitude;
-
-    // yaw parameters:
-    if (yaw_list_global.data[i]< yaw_list_global.data[i+1] && i <= gpsList.size())
-      wp.turnMode           = 0; // depends on the yaw
-    else{
-      wp.turnMode           = 1;
-    }
-
-    wp.yaw = yaw_list_global.data[i];
-
-    wp_list.push_back(wp);
-  }
-
-  // Come back home
-  start_data->index = gpsList.size();
-  wp_list.push_back(*start_data);
-
-  return wp_list;
-}
 
 
 int main(int argc, char** argv)
