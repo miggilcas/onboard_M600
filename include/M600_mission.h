@@ -33,6 +33,7 @@
 // ROS includes
 #include <ros/ros.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <std_srvs/Trigger.h>
 
 #define C_EARTH (double)6378137.0
 #define C_PI (double)3.141592653589793
