@@ -162,7 +162,25 @@ std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<senso
   return wpVector;
 }
 
-
+// start mission callback
+bool startMission(std_srvs::Trigger::Request  &req,
+         std_srvs::Trigger::Response &res){
+    ROS_WARN("Starting mission");
+    if (missionAction(DJI_MISSION_TYPE::WAYPOINT, MISSION_ACTION::START).result)
+    {
+        ROS_INFO("Mission start command sent successfully");
+        res.success = true;
+        return true;
+    }
+    else
+    {
+        ROS_WARN("Failed sending mission start command");
+        res.success = false;
+        return false;
+    }
+    
+    
+}
 
 
 void
@@ -205,18 +223,18 @@ runWaypointMission(uint8_t numWaypoints, int responseTimeout)
     return false;
   }
 
-  // Waypoint Mission: Start
-  if (missionAction(DJI_MISSION_TYPE::WAYPOINT,
-                    MISSION_ACTION::START)
-        .result)
-  {
-    ROS_INFO("Mission start command sent successfully");
-  }
-  else
-  {
-    ROS_WARN("Failed sending mission start command");
-    return false;
-  }
+  // // Waypoint Mission: Start
+  // if (missionAction(DJI_MISSION_TYPE::WAYPOINT,
+  //                   MISSION_ACTION::START)
+  //       .result)
+  // {
+  //   ROS_INFO("Mission start command sent successfully");
+  // }
+  // else
+  // {
+  //   ROS_WARN("Failed sending mission start command");
+  //   return false;
+  // }
 
   return true;
 }
@@ -702,6 +720,8 @@ int main(int argc, char** argv)
   ros::ServiceServer service_config_mission;
   /// Here we must configure our mission
   service_config_mission = nh.advertiseService("dji_control/configure_mission",configMission);
+  /// To make it more confortable we can create a service to start the mission
+  ros::ServiceServer service_start_mission = nh.advertiseService("dji_control/start_mission",startMission);
     
 
   ros::spin();
