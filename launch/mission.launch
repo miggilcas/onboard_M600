@@ -1,0 +1,8 @@
+<launch>
+        <arg name="uav_id" default="17"/>
+	
+	<group ns="uav_$(arg uav_id)">
+		<node pkg="onboard_m600" type="m600_mission_node" name="m600_mission_node" output="screen"/>
+
+	</group>
+</launch>

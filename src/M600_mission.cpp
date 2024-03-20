@@ -30,6 +30,19 @@ ros::Subscriber        gps_pos_subscriber;
 // new
 std::vector<sensor_msgs::NavSatFix> gpsList_global;
 std_msgs::Float64MultiArray yaw_list_global;
+float velocity_range;
+float idle_velocity;
+float start_altitude;
+int yaw_mode = 3;  //0 automode, 1 lock as inicital value , 2 control Rc, 3 use waypoint's yaw
+int trace_mode; // 0 point to point, after reaching the target waypoint hover, complete waypt action (if any), then fly to the next waypt 
+                // 1: Coordinated turn mode, smooth transition between waypts, no waypts task 
+int finish_action;// 0: no action, 1: return to home, 2: auto-landing, 3: return to point 0, 4: infinite mode, no exit
+
+// actions
+std_msgs::Float64MultiArray acommandList;
+std_msgs::Float64MultiArray acommandParameter;
+
+
 
 // Configuration of the mission obtained from the .YAML file
 bool configMission(aerialcore_common::ConfigMission::Request  &req,
@@ -41,18 +54,18 @@ bool configMission(aerialcore_common::ConfigMission::Request  &req,
     
     gpsList_global = req.waypoint; // WORKS
     yaw_list_global = req.yaw; // WORKS
-    //yaw_mode_global = req.yawMode; // TBD
+    yaw_mode = req.yawMode; // TBD
     //gimbal_pitch_list_global = req.gimbalPitch; // UNUSEFUL HERE
-    // velocity_range = req.maxVel;
-    // idle_velocity = req.idleVel;
+    velocity_range = req.maxVel;
+    idle_velocity = req.idleVel;
     // finish_action = req.finishAction;
 
     // //varying velocity
     // speed_global = req.speed;
 
     // actions functionality
-    std_msgs::Float64MultiArray acommandList = req.commandList; //TBD 
-    std_msgs::Float64MultiArray acommandParameter = req.commandParameter; //TBD
+    acommandList = req.commandList; //TBD 
+    acommandParameter = req.commandParameter; //TBD
     //actionNumber=0;
     
     
@@ -112,6 +125,27 @@ std::vector<DJI::OSDK::WayPointSettings> generateWaypointsCustom(WayPointSetting
   // Let's create a vector to store our waypoints in.
   std::vector<DJI::OSDK::WayPointSettings> wp_list;
 
+  // fill out the MultiArray message to make a Matrix for actions
+  acommandList.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  acommandList.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  acommandList.layout.dim[0].label = "wp";
+  acommandList.layout.dim[1].label = "nActions";
+  acommandList.layout.dim[0].size = gpsList.size();
+  acommandList.layout.dim[1].size = 10;
+  acommandList.layout.dim[0].stride = gpsList.size()*10;
+  acommandList.layout.dim[1].stride = 10;
+  acommandList.layout.data_offset = 0; 
+
+  acommandParameter.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  acommandParameter.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  acommandParameter.layout.dim[0].label = "wp";
+  acommandParameter.layout.dim[1].label = "nActions";
+  acommandParameter.layout.dim[0].size = gpsList.size();
+  acommandParameter.layout.dim[1].size = 10;
+  acommandParameter.layout.dim[0].stride = gpsList.size()*10;
+  acommandParameter.layout.dim[1].stride = 10;
+  acommandParameter.layout.data_offset = 0;
+
   // First waypoint
   start_data->index = 0;
   wp_list.push_back(*start_data);
@@ -136,6 +170,21 @@ std::vector<DJI::OSDK::WayPointSettings> generateWaypointsCustom(WayPointSetting
 
     wp.yaw = yaw_list_global.data[i];
 
+    // actions
+    wp.hasAction =1;
+    wp.actionTimeLimit = 100;
+    wp.actionNumber = 10; // fixed in 10 for now
+    //full information for actions:     Onboard-SDK/osdk-core/api/inc/dji_mission_type.hpp
+    for (int j = 0; j < wp.actionNumber; j++)
+    {
+      wp.commandList[j]      = acommandList.data[i*wp.actionNumber+j];
+      wp.commandParameter[j] = acommandParameter.data[i*wp.actionNumber+j];
+    }
+    
+
+    ROS_INFO(" Waypoint created at (LLA): %f \t%f \t%f with yaw %f \n", wp.latitude,
+           wp.longitude, wp.altitude, wp.yaw);
+
     wp_list.push_back(wp);
   }
 
@@ -154,7 +203,7 @@ std::vector<DJI::OSDK::WayPointSettings> createWaypointsCustom(std::vector<senso
   start_wp.latitude  = gps_pos.latitude;
   start_wp.longitude = gps_pos.longitude;
   start_wp.altitude  = start_alt;
-  ROS_INFO("Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
+  ROS_INFO(" First Waypoint created at (LLA): %f \t%f \t%f\n", gps_pos.latitude,
            gps_pos.longitude, start_alt);
 
   std::vector<DJI::OSDK::WayPointSettings> wpVector = generateWaypointsCustom(&start_wp, gpsList);
@@ -260,11 +309,11 @@ setWaypointDefaults(WayPointSettings* wp)
 void
 setWaypointInitDefaults(dji_sdk::MissionWaypointTask& waypointTask)
 {
-  waypointTask.velocity_range     = 10;
-  waypointTask.idle_velocity      = 5;
-  waypointTask.action_on_finish   = dji_sdk::MissionWaypointTask::FINISH_NO_ACTION;
+  waypointTask.velocity_range     = velocity_range;
+  waypointTask.idle_velocity      = idle_velocity;
+  waypointTask.action_on_finish   = dji_sdk::MissionWaypointTask::FINISH_AUTO_LANDING;//FINISH_NO_ACTION;
   waypointTask.mission_exec_times = 1;
-  waypointTask.yaw_mode           = dji_sdk::MissionWaypointTask::YAW_MODE_AUTO;
+  waypointTask.yaw_mode           = yaw_mode;//dji_sdk::MissionWaypointTask::YAW_MODE_AUTO;
   waypointTask.trace_mode         = dji_sdk::MissionWaypointTask::TRACE_POINT;
   waypointTask.action_on_rc_lost  = dji_sdk::MissionWaypointTask::ACTION_AUTO;
   waypointTask.gimbal_pitch_mode  = dji_sdk::MissionWaypointTask::GIMBAL_PITCH_FREE;
